@@ -4,13 +4,15 @@
 #include "data/data.sp"
 
 #define REW 400
+#define DELAY 30.0
+#define TIME_TO_ANSWER 15.0
 
 public Plugin myinfo = 
 { 
 	name = "Correct Answer", 
 	author = "Palonez", 
 	description = "The plugin gives a reward to the one who first entered the specified word correctly", 
-	version = "1.0",
+	version = "1.1",
 	url = "https://github.com/Quake1011" 
 };
 
@@ -19,7 +21,7 @@ char sWord[sizeof(Dictionary) - 1];
 
 public void OnPluginStart()
 {
-	CreateTimer(30.0, Rotation, _, TIMER_REPEAT);
+	CreateTimer(DELAY, Rotation, _, TIMER_REPEAT);
 	
 	HookEvent("player_say", PlayerSay);
 }
@@ -47,5 +49,14 @@ public Action Rotation(Handle hTimer)
 	TrimString(sWord);
 	CGOPrintToChatAll("Напиши слово \"{GREEN}%s{DEFAULT}\" и получи {RED}%d{DEFAULT} кредитов", sWord, REW);
 	bCanSend = true;
+	
+	CreateTimer(TIME_TO_ANSWER, TimeToAnswer);
+	return Plugin_Continue;
+}
+
+public Action TimeToAnswer(Handle hTimer)
+{
+	bCanSend = false;
+	CGOPrintToChatAll("Время вышло, никто не ответил");
 	return Plugin_Continue;
 }
