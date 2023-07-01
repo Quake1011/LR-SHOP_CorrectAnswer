@@ -17,20 +17,24 @@ char sWord[256], sTag[128];
 int iReward;
 float fDelay, fTime;
 ArrayList word;
+int diap[2];
 
 public void OnPluginStart()
 {
 	ConVar cvar;
 	
 	HookConVarChange(cvar = CreateConVar("correct_reward", "100-500", "Величина награды. Может принимать диапазон значений[200-700] или конкретное значение[400]"), OnCVChange);
-	char temp[2*11+1], intgr[2][11];
+	char temp[2*11+1];
 	GetConVarString(cvar, temp, sizeof(temp));
 	if(StrContains(temp, "-", true) != -1)
 	{
+		char intgr[2][11];
 		ExplodeString(temp, "-", intgr, sizeof(intgr), sizeof(intgr[]));
-		iReward = GetRandomInt(StringToInt(intgr[0]), StringToInt(intgr[1]));
+		diap[0] = StringToInt(intgr[0]);
+		diap[1] = StringToInt(intgr[1]);
 	}
-	iReward = StringToInt(temp);
+	diap[0] = StringToInt(temp);
+	diap[1] = StringToInt(temp);
 	
 	float x = 1.0
 	HookConVarChange(cvar = CreateConVar("correct_delay", "30.0", "Время между генерацией нового слова", _, true, x+1.0), OnCVChange1);
@@ -39,7 +43,7 @@ public void OnPluginStart()
 	HookConVarChange(cvar = CreateConVar("correct_time_to_answer", "15.0", "Время на ответ", _, true, x), OnCVChange2);
 	fTime = GetConVarFloat(cvar);
 	
-	HookConVarChange(cvar = CreateConVar("correct_scramble", "1", "Пемешивать буквы в словах? [0 - Нет \\ 1 - Да]"), OnCVChange3);
+	HookConVarChange(cvar = CreateConVar("correct_scramble", "1", "Перемешивать буквы в словах? [0 - Нет \\ 1 - Да]"), OnCVChange3);
 	bScramble = GetConVarBool(cvar);
 	if(bScramble) word = CreateArray(64);
 	
@@ -55,14 +59,17 @@ public void OnPluginStart()
 
 public void OnCVChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	char temp[2*11+1], intgr[2][11];
+	char temp[2*11+1];
 	GetConVarString(convar, temp, sizeof(temp));
 	if(StrContains(temp, "-", true) != -1)
 	{
+		char intgr[2][11];
 		ExplodeString(temp, "-", intgr, sizeof(intgr), sizeof(intgr[]));
-		iReward = GetRandomInt(StringToInt(intgr[0]), StringToInt(intgr[1]));
+		diap[0] = StringToInt(intgr[0]);
+		diap[1] = StringToInt(intgr[1]);
 	}
-	iReward = StringToInt(temp);
+	diap[0] = StringToInt(temp);
+	diap[1] = StringToInt(temp);
 }
 
 public void OnCVChange1(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -112,7 +119,7 @@ public Action Rotation(Handle hTimer)
 	strcopy(sWord, sizeof(sWord), Dictionary[random]);
 	TrimString(sWord);
 
-	LogMessage(sWord);
+	iReward = GetRandomInt(diap[0], diap[1]);
 
 	if(bScramble)
 	{
