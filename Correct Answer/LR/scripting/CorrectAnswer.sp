@@ -124,49 +124,30 @@ public Action Rotation(Handle hTimer)
 
 	if(bScramble)
 	{
-
-		bool cyrillic;
-		if(65 <= RoundToFloor(float(sWord[0])) <= 90 || 97 <= RoundToFloor(float(sWord[0])) <= 122)
-			cyrillic = false;
-		else if(192 <= RoundToFloor(float(sWord[0])) <= 255)
-			cyrillic = true;	
-		else
-		{	
-			LogMessage("Unsupported word \"%s\" on array line:%d | index: %d", sWord, random+3, random);
-			LogMessage("Delete the word and reload plugin");
-			return Plugin_Stop;
-		}
-		
 		word.Clear();
-		
-		if(cyrillic)
+		char temp[3];
+		for(int i = 0; i < strlen(sWord);)
 		{
-			for(int i = 0; i < strlen(sWord)-1; i+=2)
+			temp[0] = sWord[i];
+			if(IsCharMB(sWord[i]))
 			{
-				char temp[2];
-				temp[0] = sWord[i];
 				temp[1] = sWord[i+1];
-				word.PushString(temp);
+				i+=IsCharMB(sWord[i]);
 			}
-			
-			for(int i = 0 ; i < 3; i++)
-				word.Sort(Sort_Random, Sort_String);
-		}
-		else
-		{
-			for(int i = 0; i < strlen(sWord); i++)
-				word.Push(RoundToFloor(float(sWord[i])));
+			else i++;
 
-			for(int i = 0 ; i < 3; i++)
-				word.Sort(Sort_Random, Sort_Integer);
+			word.PushString(temp);
 		}
 		
-		char temp[6], abs[256];
+		word.Sort(Sort_Random, Sort_String);
+	
+		char abs[256];
 		for(int i = 0; i < word.Length; i++)
 		{
-			Format(temp, sizeof(temp), "%s", word.Get(i))
+			temp = NULL_STRING;
+			word.GetString(i, temp, sizeof(temp));
 			StrCat(abs, sizeof(abs), temp);
-		}		
+		}
 
 		CGOPrintToChatAll("%s Напиши правильно слово \"{GREEN}%s{DEFAULT}\" и получи {RED}%d{DEFAULT} опыта",sTag, abs, iReward);
 	}

@@ -24,11 +24,10 @@ public void OnPluginStart()
 	ConVar cvar;
 	
 	HookConVarChange(cvar = CreateConVar("correct_reward", "100-500", "Величина награды. Может принимать диапазон значений[200-700] или конкретное значение[400]"), OnCVChange);
-	char temp[2*11+1];
+	char temp[2*11+1], intgr[2][11];
 	GetConVarString(cvar, temp, sizeof(temp));
 	if(StrContains(temp, "-", true) != -1)
 	{
-		char intgr[2][11];
 		ExplodeString(temp, "-", intgr, sizeof(intgr), sizeof(intgr[]));
 		diap[0] = StringToInt(intgr[0]);
 		diap[1] = StringToInt(intgr[1]);
@@ -36,14 +35,14 @@ public void OnPluginStart()
 	diap[0] = StringToInt(temp);
 	diap[1] = StringToInt(temp);
 	
-	float x = 1.0
+	float x = 1.0;
 	HookConVarChange(cvar = CreateConVar("correct_delay", "30.0", "Время между генерацией нового слова", _, true, x+1.0), OnCVChange1);
 	fDelay = GetConVarFloat(cvar);
 	
 	HookConVarChange(cvar = CreateConVar("correct_time_to_answer", "15.0", "Время на ответ", _, true, x), OnCVChange2);
 	fTime = GetConVarFloat(cvar);
 	
-	HookConVarChange(cvar = CreateConVar("correct_scramble", "1", "Перемешивать буквы в словах? [0 - Нет \\ 1 - Да]"), OnCVChange3);
+	HookConVarChange(cvar = CreateConVar("correct_scramble", "1", "Пемешивать буквы в словах? [0 - Нет \\ 1 - Да]"), OnCVChange3);
 	bScramble = GetConVarBool(cvar);
 	if(bScramble) word = CreateArray(64);
 	
@@ -59,11 +58,10 @@ public void OnPluginStart()
 
 public void OnCVChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	char temp[2*11+1];
+	char temp[2*11+1], intgr[2][11];
 	GetConVarString(convar, temp, sizeof(temp));
 	if(StrContains(temp, "-", true) != -1)
 	{
-		char intgr[2][11];
 		ExplodeString(temp, "-", intgr, sizeof(intgr), sizeof(intgr[]));
 		diap[0] = StringToInt(intgr[0]);
 		diap[1] = StringToInt(intgr[1]);
@@ -117,55 +115,35 @@ public Action Rotation(Handle hTimer)
 {
 	int random = GetRandomInt(0, sizeof(Dictionary) - 1);
 	strcopy(sWord, sizeof(sWord), Dictionary[random]);
-	TrimString(sWord);
 
 	iReward = GetRandomInt(diap[0], diap[1]);
 
 	if(bScramble)
 	{
-
-		bool cyrillic;
-		if(65 <= RoundToFloor(float(sWord[0])) <= 90 || 97 <= RoundToFloor(float(sWord[0])) <= 122)
-			cyrillic = false;
-		else if(192 <= RoundToFloor(float(sWord[0])) <= 255)
-			cyrillic = true;	
-		else
-		{	
-			LogMessage("Unsupported word \"%s\" on array line:%d | index: %d", sWord, random+3, random);
-			LogMessage("Delete the word and reload plugin");
-			return Plugin_Stop;
-		}
-		
 		word.Clear();
-		
-		if(cyrillic)
+		char temp[3];
+		for(int i = 0; i < strlen(sWord);)
 		{
-			for(int i = 0; i < strlen(sWord)-1; i+=2)
+			temp[0] = sWord[i];
+			if(IsCharMB(sWord[i]))
 			{
-				char temp[2];
-				temp[0] = sWord[i];
 				temp[1] = sWord[i+1];
-				word.PushString(temp);
+				i+=IsCharMB(sWord[i]);
 			}
-			
-			for(int i = 0 ; i < 3; i++)
-				word.Sort(Sort_Random, Sort_String);
-		}
-		else
-		{
-			for(int i = 0; i < strlen(sWord); i++)
-				word.Push(RoundToFloor(float(sWord[i])));
+			else i++;
 
-			for(int i = 0 ; i < 3; i++)
-				word.Sort(Sort_Random, Sort_Integer);
+			word.PushString(temp);
 		}
 		
-		char temp[6], abs[256];
+		word.Sort(Sort_Random, Sort_String);
+	
+		char abs[256];
 		for(int i = 0; i < word.Length; i++)
 		{
-			Format(temp, sizeof(temp), "%s", word.Get(i))
+			temp = NULL_STRING;
+			word.GetString(i, temp, sizeof(temp));
 			StrCat(abs, sizeof(abs), temp);
-		}		
+		}
 
 		CGOPrintToChatAll("%s Напиши правильно слово \"{GREEN}%s{DEFAULT}\" и получи {RED}%d{DEFAULT} кредитов",sTag, abs, iReward);
 	}
