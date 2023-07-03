@@ -31,6 +31,7 @@ public void OnPluginStart()
 			TrimString(tmp);
 			Dictionary.PushString(tmp);
 		} while(!hFile.EndOfFile());
+		delete hFile;
 	}
 	else 
 	{
