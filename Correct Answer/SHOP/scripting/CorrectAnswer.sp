@@ -1,50 +1,55 @@
 #include <shop>
 #include <csgo_colors>
 
-#include "data/data.sp"
-
 public Plugin myinfo = 
 { 
 	name = "Correct Answer", 
 	author = "Palonez", 
 	description = "The plugin gives a reward to the one who first entered the specified word correctly", 
-	version = "1.2",
+	version = "1.3",
 	url = "https://github.com/Quake1011" 
 };
 
 bool bCanSend, bScramble;
 char sWord[256], sTag[128];
-int iReward;
+int iReward, diap[2];
 float fDelay, fTime;
-ArrayList word;
-int diap[2];
+ArrayList Dictionary;
 
 public void OnPluginStart()
 {
-	ConVar cvar;
-	
-	HookConVarChange(cvar = CreateConVar("correct_reward", "100-500", "Величина награды. Может принимать диапазон значений[200-700] или конкретное значение[400]"), OnCVChange);
-	char temp[2*11+1], intgr[2][11];
-	GetConVarString(cvar, temp, sizeof(temp));
-	if(StrContains(temp, "-", true) != -1)
+	char sFile[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, sFile, sizeof(sFile), "configs/dictionary.txt");
+	File hFile = OpenFile(sFile, "r");
+	if(hFile != null)
 	{
-		ExplodeString(temp, "-", intgr, sizeof(intgr), sizeof(intgr[]));
-		diap[0] = StringToInt(intgr[0]);
-		diap[1] = StringToInt(intgr[1]);
+		Dictionary = CreateArray(256);
+		char[] tmp = new char[Dictionary.BlockSize];
+		do
+		{
+			hFile.ReadLine(tmp, Dictionary.BlockSize-1);
+			TrimString(tmp);
+			Dictionary.PushString(tmp);
+		} while(!hFile.EndOfFile());
 	}
-	diap[0] = StringToInt(temp);
-	diap[1] = StringToInt(temp);
+	else 
+	{
+		SetFailState("Cant open file \"configs/dictionary.txt\"");
+		return;
+	}
+
+	ConVar cvar;
+	HookConVarChange(cvar = CreateConVar("correct_reward", "100-500", "Величина награды. Может принимать диапазон значений[200-700] или конкретное значение[400]"), OnCVChange);
+	GetRandom(cvar);
 	
-	float x = 1.0;
-	HookConVarChange(cvar = CreateConVar("correct_delay", "30.0", "Время между генерацией нового слова", _, true, x+1.0), OnCVChange1);
+	HookConVarChange(cvar = CreateConVar("correct_delay", "30.0", "Время между генерацией нового слова"), OnCVChange1);
 	fDelay = GetConVarFloat(cvar);
 	
-	HookConVarChange(cvar = CreateConVar("correct_time_to_answer", "15.0", "Время на ответ", _, true, x), OnCVChange2);
+	HookConVarChange(cvar = CreateConVar("correct_time_to_answer", "15.0", "Время на ответ"), OnCVChange2);
 	fTime = GetConVarFloat(cvar);
 	
-	HookConVarChange(cvar = CreateConVar("correct_scramble", "1", "Пемешивать буквы в словах? [0 - Нет \\ 1 - Да]"), OnCVChange3);
+	HookConVarChange(cvar = CreateConVar("correct_scramble", "1", "Перемешивать буквы в словах? [0 - Нет \\ 1 - Да]"), OnCVChange3);
 	bScramble = GetConVarBool(cvar);
-	if(bScramble) word = CreateArray(64);
 	
 	HookConVarChange(cvar = CreateConVar("correct_tag", "{RED}[{GREEN}ANSWER{RED}]{DEFAULT}", "Тег плагина"), OnCVChange4);
 	GetConVarString(cvar, sTag, sizeof(sTag));
@@ -53,21 +58,14 @@ public void OnPluginStart()
 	
 	HookEvent("player_say", PlayerSay);
 	
+	LoadTranslations("CorrectAnswer.phrases");
+	
 	AutoExecConfig(true, "CorrectAnswer");
 }
 
 public void OnCVChange(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	char temp[2*11+1], intgr[2][11];
-	GetConVarString(convar, temp, sizeof(temp));
-	if(StrContains(temp, "-", true) != -1)
-	{
-		ExplodeString(temp, "-", intgr, sizeof(intgr), sizeof(intgr[]));
-		diap[0] = StringToInt(intgr[0]);
-		diap[1] = StringToInt(intgr[1]);
-	}
-	diap[0] = StringToInt(temp);
-	diap[1] = StringToInt(temp);
+	GetRandom(convar);
 }
 
 public void OnCVChange1(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -88,10 +86,6 @@ public void OnCVChange3(ConVar convar, const char[] oldValue, const char[] newVa
 public void OnCVChange4(ConVar convar, const char[] oldValue, const char[] newValue)
 {
 	bScramble = GetConVarBool(convar);
-	if(bScramble) 
-		word = CreateArray(64);
-	else 
-		delete word;
 }
 
 public Action PlayerSay(Event hEvent, const char[] sEvent, bool bdb)
@@ -104,8 +98,8 @@ public Action PlayerSay(Event hEvent, const char[] sEvent, bool bdb)
 	{
 		if(strcmp(text, sWord, true) == 0)
 		{
-			CGOPrintToChatAll("%s Игрок {OLIVE}%N{DEFAULT} правильно ввел слово \"{GREEN}%s{DEFAULT}\" и получил {RED}%d{DEFAULT} кредитов",sTag, client, sWord, Shop_GiveClientCredits(client, iReward))
-			bCanSend = false;
+			CGOPrintToChatAll("%t", "ph1" ,sTag, client, sWord, Shop_GiveClientCredits(client, iReward));
+			bCanSend = !bCanSend;
 		}
 	}
 	return Plugin_Continue;
@@ -113,41 +107,15 @@ public Action PlayerSay(Event hEvent, const char[] sEvent, bool bdb)
 
 public Action Rotation(Handle hTimer)
 {
-	int random = GetRandomInt(0, sizeof(Dictionary) - 1);
-	strcopy(sWord, sizeof(sWord), Dictionary[random]);
-
+	Dictionary.GetString(GetRandomInt(0, Dictionary.Length-1), sWord, sizeof(sWord));
 	iReward = GetRandomInt(diap[0], diap[1]);
-
+	
 	if(bScramble)
 	{
-		word.Clear();
-		char temp[3];
-		for(int i = 0; i < strlen(sWord);)
-		{
-			temp[0] = sWord[i];
-			if(IsCharMB(sWord[i]))
-			{
-				temp[1] = sWord[i+1];
-				i+=IsCharMB(sWord[i]);
-			}
-			else i++;
-
-			word.PushString(temp);
-		}
-		
-		word.Sort(Sort_Random, Sort_String);
-	
-		char abs[256];
-		for(int i = 0; i < word.Length; i++)
-		{
-			temp = NULL_STRING;
-			word.GetString(i, temp, sizeof(temp));
-			StrCat(abs, sizeof(abs), temp);
-		}
-
-		CGOPrintToChatAll("%s Напиши правильно слово \"{GREEN}%s{DEFAULT}\" и получи {RED}%d{DEFAULT} кредитов",sTag, abs, iReward);
+		SortRandomString(sWord);
+		CGOPrintToChatAll("%t", "ph2", sTag, sWord, iReward);
 	}
-	else CGOPrintToChatAll("%s Напиши слово \"{GREEN}%s{DEFAULT}\" и получи {RED}%d{DEFAULT} кредитов",sTag, sWord, iReward);
+	else CGOPrintToChatAll("%t", "ph3", sTag, sWord, iReward);
 	bCanSend = true;
 	
 	CreateTimer(fTime, TimeToAnswer);
@@ -156,7 +124,46 @@ public Action Rotation(Handle hTimer)
 
 public Action TimeToAnswer(Handle hTimer)
 {
-	if(bCanSend) CGOPrintToChatAll("%s Время вышло, никто не ответил", sTag);
+	if(bCanSend) CGOPrintToChatAll("%t", "ph4", sTag);
 	bCanSend = false;
 	return Plugin_Continue;
+}
+
+stock void SortRandomString(char[] szText) // спасибо https://hlmod.net/members/komashchenko.49508/
+{
+    int iTextLen = strlen(szText);
+    int[] iTextSymbolPos = new int[iTextLen];
+    int iSymbols = 0;
+    char[] szTextSorted = new char[iTextLen];
+    
+    for(int i = 0; i < iTextLen;)
+    {
+        iTextSymbolPos[iSymbols++] = i;
+        i += GetCharBytes(szText[i]);
+    }
+    
+    SortIntegers(iTextSymbolPos, iSymbols, Sort_Random);
+    
+    for(int i = 0, k = 0; i < iSymbols; i++)
+    {
+        int iBytes = GetCharBytes(szText[iTextSymbolPos[i]]);
+        for(int u = 0; u < iBytes; u++)
+            szTextSorted[k++] = szText[iTextSymbolPos[i] + u];
+    }
+    
+    strcopy(szText, iTextLen + 1, szTextSorted);
+}
+
+stock void GetRandom(ConVar cvar)
+{
+	char temp[2*11-1];
+	GetConVarString(cvar, temp, sizeof(temp));
+	if(StrContains(temp, "-", true) != -1)
+	{
+		char intgr[2][11];
+		ExplodeString(temp, "-", intgr, sizeof(intgr), sizeof(intgr[]));
+		diap[0] = StringToInt(intgr[0]);
+		diap[1] = StringToInt(intgr[1]);
+	}
+	diap[0] = diap[1] = StringToInt(temp);
 }
