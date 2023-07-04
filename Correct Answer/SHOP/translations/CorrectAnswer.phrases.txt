@@ -10,7 +10,7 @@
 	{
 		"#format"			"{1:s},{2:s},{3:i}"
 		"ru"				"{1} Напиши правильно слово \"{GREEN}{2}{DEFAULT}\" и получи {RED}{3}{DEFAULT} кредитов"
-		"en"				"{1} Type correctly word \"{GREEN}{2}{DEFAULT}\" and got {RED}{3}{DEFAULT} credits"
+		"en"				"{1} Type correctly правильно word \"{GREEN}{2}{DEFAULT}\" and got {RED}{3}{DEFAULT} credits"
 	}
 	"ph3"
 	{
@@ -23,5 +23,17 @@
 		"#format"			"{1:s}"
 		"ru"				"{1} Время вышло, никто не ответил"
 		"en"				"{1} Time is up, no one answered"
+	}
+	"ph5"
+	{
+		"#format"			"{1:s}"
+		"ru"				"{1} TOP-3 игроков по правильным ответам"
+		"en"				"{1} TOP-3 players by correct answers"
+	}
+	"ph6"
+	{
+		"#format"			"{1:i}, {2:s}, {3:i}"
+		"ru"				"{OLIVE}{1}. {DEFAULT}{2} - {GREEN}{3}"
+		"en"				"{OLIVE}{1}. {DEFAULT}{2} - {GREEN}{3}"
 	}
 }

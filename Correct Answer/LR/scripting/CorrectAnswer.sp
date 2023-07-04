@@ -6,15 +6,17 @@ public Plugin myinfo =
 	name = "Correct Answer", 
 	author = "Palonez", 
 	description = "The plugin gives a reward to the one who first entered the specified word correctly", 
-	version = "1.3",
+	version = "1.4",
 	url = "https://github.com/Quake1011" 
 };
 
-bool bCanSend, bScramble;
-char sWord[256], sTag[128];
+bool bCanSend, bScramble, bRateStatus;
+char sWord[256], sTag[128], sTableName[256], sQuery[256];
 int iReward, diap[2];
-float fDelay, fTime;
+float fDelay, fTime, fRateTime;
 ArrayList Dictionary;
+Database db;
+Handle hTOP3;
 
 public void OnPluginStart()
 {
@@ -38,7 +40,7 @@ public void OnPluginStart()
 		SetFailState("Cant open file \"configs/dictionary.txt\"");
 		return;
 	}
-
+	
 	ConVar cvar;
 	HookConVarChange(cvar = CreateConVar("correct_reward", "100-500", "Величина награды. Может принимать диапазон значений[200-700] или конкретное значение[400]"), OnCVChange);
 	GetRandom(cvar);
@@ -55,13 +57,45 @@ public void OnPluginStart()
 	HookConVarChange(cvar = CreateConVar("correct_tag", "{RED}[{GREEN}ANSWER{RED}]{DEFAULT}", "Тег плагина"), OnCVChange4);
 	GetConVarString(cvar, sTag, sizeof(sTag));
 	
+	HookConVarChange(cvar = CreateConVar("correct_table_name", "CorrectAnswer_Rating", "Имя таблицы рейтинга в базе"), OnCVChange5);
+	GetConVarString(cvar, sTableName, sizeof(sTableName));
+	
+	HookConVarChange(cvar = CreateConVar("correct_rating_status", "1", "Включено ли периодическое отображение рейтинга в чате"), OnCVChange6);
+	bRateStatus = GetConVarBool(cvar);
+	
+	HookConVarChange(cvar = CreateConVar("correct_rating_rotation", "50.0", "Время между показами рейтинга"), OnCVChange7);
+	fRateTime = GetConVarFloat(cvar);
+	
+	Database.Connect(SQLConnect, "correct_answer");
+	
 	CreateTimer(fDelay, Rotation, _, TIMER_REPEAT);
+	if(bRateStatus) hTOP3 = CreateTimer(fRateTime, OutputTOP3, _, TIMER_REPEAT);
+	else if(hTOP3 != null) hTOP3 = null;
 	
 	HookEvent("player_say", PlayerSay);
 	
 	LoadTranslations("CorrectAnswer.phrases");
 	
 	AutoExecConfig(true, "CorrectAnswer");
+}
+
+public void SQLConnect(Database hdb, const char[] error, any data)
+{
+	if(hdb != null && !error[0]) 
+	{
+		db = hdb;
+		db.SetCharset("utf8");
+		Format(sQuery, sizeof(sQuery), "CREATE TABLE IF NOT EXISTS `%s`(\
+										`steam` VARCHAR(22) PRIMARY KEY,\
+										`name` VARCHAR(%d),\
+										`correct_answers` INTEGER(11) DEFAULT 0)", sTableName, MAX_NAME_LENGTH);
+		SQL_FastQuery(db, sQuery);
+	}
+	else
+	{
+		SetFailState("Cant connect to database. Please check the section \"correct_answer\" in databases.cfg");
+		return;
+	}
 }
 
 public void OnCVChange(ConVar convar, const char[] oldValue, const char[] newValue)
@@ -81,12 +115,29 @@ public void OnCVChange2(ConVar convar, const char[] oldValue, const char[] newVa
 
 public void OnCVChange3(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	GetConVarString(convar, sTag, sizeof(sTag));
+	bScramble = GetConVarBool(convar);
 }
 
 public void OnCVChange4(ConVar convar, const char[] oldValue, const char[] newValue)
 {
-	bScramble = GetConVarBool(convar);
+	GetConVarString(convar, sTag, sizeof(sTag));
+}
+
+public void OnCVChange5(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	GetConVarString(convar, sTableName, sizeof(sTableName));
+}
+
+public void OnCVChange6(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	bRateStatus = GetConVarBool(convar);
+	if(!bRateStatus && hTOP3 != null)
+		hTOP3 = null;
+}
+
+public void OnCVChange7(ConVar convar, const char[] oldValue, const char[] newValue)
+{
+	fRateTime = GetConVarFloat(convar);
 }
 
 public Action PlayerSay(Event hEvent, const char[] sEvent, bool bdb)
@@ -102,8 +153,50 @@ public Action PlayerSay(Event hEvent, const char[] sEvent, bool bdb)
 			LR_ChangeClientValue(client, iReward);
 			CGOPrintToChatAll("%t", "ph1" ,sTag, client, sWord, iReward);
 			bCanSend = !bCanSend;
+			AddClientScore(client);
 		}
 	}
+	return Plugin_Continue;
+}
+
+void AddClientScore(int client)
+{
+	if(db != null)
+	{
+		char sAuth[22];
+		GetClientAuthId(client, AuthId_Steam2, sAuth, sizeof(sAuth));
+		Format(sQuery, sizeof(sQuery), "SELECT * FROM `%s` WHERE `steam` = '%s'", sTableName, sAuth);
+		DBResultSet result = SQL_Query(db, sQuery);
+		if(result != null && result.HasResults && result.RowCount == 1) Format(sQuery, sizeof(sQuery), "UPDATE `%s` SET `correct_answers` = `correct_answers`+1 WHERE `steam` = '%s'", sTableName, sAuth);
+		else Format(sQuery, sizeof(sQuery), "INSERT INTO `%s` (`steam`, `name`, `correct_answers`) VALUES ('%s', '%N', 1)", sTableName, sAuth, client);
+		SQL_FastQuery(db, sQuery);
+	}
+}
+
+public Action OutputTOP3(Handle hTimer)
+{
+	Format(sQuery, sizeof(sQuery), "SELECT `name`, `correct_answers` FROM `%s` ORDER BY `correct_answers` DESC LIMIT 3", sTableName);
+	DBResultSet result = SQL_Query(db, sQuery);
+	if(result != null && result.HasResults)
+	{
+		if(result.RowCount)
+		{
+			int i = 1;
+			char name[MAX_NAME_LENGTH], bf[1024], buffer[256];
+			Format(bf, sizeof(bf), "%t\n", "ph5", sTag);
+			result.FetchRow();
+			do
+			{
+				result.FetchString(0, name, sizeof(name));
+				Format(buffer, sizeof(buffer), "%t\n","ph6", i, name, result.FetchInt(1));
+				StrCat(bf, sizeof(bf), buffer);
+				i++;
+			} while(result.FetchRow());
+			TrimString(bf);
+			CGOPrintToChatAll(bf);
+		}
+	}
+	delete result;
 	return Plugin_Continue;
 }
 
@@ -114,8 +207,10 @@ public Action Rotation(Handle hTimer)
 	
 	if(bScramble)
 	{
-		SortRandomString(sWord);
-		CGOPrintToChatAll("%t", "ph2", sTag, sWord, iReward);
+		char[] tempword = new char[sizeof(sWord)-1];
+		strcopy(tempword, sizeof(sWord)-1, sWord);
+		SortRandomString(tempword);
+		CGOPrintToChatAll("%t", "ph2", sTag, tempword, iReward);
 	}
 	else CGOPrintToChatAll("%t", "ph3", sTag, sWord, iReward);
 	bCanSend = true;

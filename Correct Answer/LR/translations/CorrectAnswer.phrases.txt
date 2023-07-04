@@ -24,4 +24,16 @@
 		"ru"				"{1} Время вышло, никто не ответил"
 		"en"				"{1} Time is up, no one answered"
 	}
+	"ph5"
+	{
+		"#format"			"{1:s}"
+		"ru"				"{1} TOP-3 игроков по правильным ответам"
+		"en"				"{1} TOP-3 players by correct answers"
+	}
+	"ph6"
+	{
+		"#format"			"{1:i}, {2:s}, {3:i}"
+		"ru"				"{OLIVE}{1}. {DEFAULT}{2} - {GREEN}{3}"
+		"en"				"{OLIVE}{1}. {DEFAULT}{2} - {GREEN}{3}"
+	}
 }
