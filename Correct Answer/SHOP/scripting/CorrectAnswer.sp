@@ -60,7 +60,7 @@ public void OnPluginStart()
 	HookConVarChange(cvar = CreateConVar("correct_table_name", "CorrectAnswer_Rating", "Имя таблицы рейтинга в базе"), OnCVChange5);
 	GetConVarString(cvar, sTableName, sizeof(sTableName));
 	
-	HookConVarChange(cvar = CreateConVar("correct_rating_status", "1", "Включено ли периодическое отображение рейтинга в чате"), OnCVChange6);
+	HookConVarChange(cvar = CreateConVar("correct_rating_status", "1", "Включено ли периодическое отображение рейтинга в чате [0 - Нет \\ 1 - Да]"), OnCVChange6);
 	bRateStatus = GetConVarBool(cvar);
 	
 	HookConVarChange(cvar = CreateConVar("correct_rating_rotation", "50.0", "Время между показами рейтинга"), OnCVChange7);
